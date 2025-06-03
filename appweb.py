@@ -160,41 +160,55 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-
+#importar datos
 class DataHandler:
-    def __init__(self):
-        self.CSV_URL = "https://datos.gob.cl/dataset/permisos-de-circulacion-12025/resource/346da1c7-5a58-4b25-966e-6c832228cdb3/download/permiso-de-circulacion-2025.csv"
+    def __init__(self, custom_url=None):
+        self.default_csv_url = "https://datos.gob.cl/dataset/permisos-de-circulacion-12025/resource/346da1c7-5a58-4b25-966e-6c832228cdb3/download/permiso-de-circulacion-2025.csv"
+        self.url = custom_url if custom_url else self.default_csv_url
 
     def get_data(self, limit=1000):
         try:
-            df = pd.read_csv(self.CSV_URL, sep=";", encoding='latin1')
+            if self.url.endswith(".csv"):
+                df = pd.read_csv(self.url, sep=";", encoding="latin1")
+            elif "datastore_search" in self.url:
+                response = requests.get(self.url, timeout=10)
+                records = response.json()["result"]["records"]
+                df = pd.DataFrame(records)
+            else:
+                raise ValueError("Formato de enlace no compatible.")
+            
             df.columns = [col.strip().upper() for col in df.columns]
+
             if "FECHA" in df.columns:
                 df["FECHA"] = pd.to_datetime(df["FECHA"], errors='coerce')
+
             return df.head(limit)
         except Exception as e:
             st.error(f"Error al obtener datos: {str(e)}")
             return pd.DataFrame()
 
-# Inicialización
-handler = DataHandler()
-
 # Sidebar
 with st.sidebar:
     st.header("⚙️ Configuración Global")
+    
+    custom_url = st.text_input("🔗 Enlace personalizado (opcional)", placeholder="https://datos.gob.cl/...")
 
     limit = st.slider("Límite de registros", 100, 200)
 
     if st.button("Cargar Datos", type="primary", key="btn_cargar_datos"):
         with st.spinner("Obteniendo datos..."):
+            handler = DataHandler(custom_url if custom_url else None)
             st.session_state.df = handler.get_data(limit=limit)
 
-          ### Cómo usar esta app
+    st.markdown("---")
+    st.markdown(
+        """
+        ### Cómo usar esta app
 
-        1. Presiona **Cargar Datos** para obtener el conjunto de datos.
-        2. Selecciona las variables que deseas para el **Eje X** y **Eje Y**.
-        3. Elige el tipo de gráfico que quieres generar.
-        4. Haz clic en **Generar Visualización** para ver el gráfico.
+        1. Puedes dejar el enlace en blanco o pegar uno de datos.gob.cl.
+        2. Presiona **Cargar Datos** para obtener el conjunto de datos.
+        3. Selecciona variables y tipo de gráfico.
+        4. Haz clic en **Generar Visualización**.
         """
     )
 
