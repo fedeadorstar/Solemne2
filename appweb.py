@@ -327,3 +327,4 @@ if st.button("Generar Visualización", key="btn_generar_viz"):
 
     except Exception as e:
         st.error(f"Error al generar gráfico: {str(e)}")
+# que tenga un buen dia profe
