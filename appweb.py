@@ -160,7 +160,8 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-#importar datos
+
+#Clase para manejar los datos 
 class DataHandler:
     def __init__(self, custom_url=None):
         self.default_csv_url = "https://datos.gob.cl/dataset/permisos-de-circulacion-12025/resource/346da1c7-5a58-4b25-966e-6c832228cdb3/download/permiso-de-circulacion-2025.csv"
@@ -172,7 +173,8 @@ class DataHandler:
                 df = pd.read_csv(self.url, sep=";", encoding="latin1")
             elif "datastore_search" in self.url:
                 response = requests.get(self.url, timeout=10)
-                records = response.json()["result"]["records"]
+                data = json.loads(response.text)
+                records = data["result"]["records"]
                 df = pd.DataFrame(records)
             else:
                 raise ValueError("Formato de enlace no compatible.")
@@ -187,13 +189,13 @@ class DataHandler:
             st.error(f"Error al obtener datos: {str(e)}")
             return pd.DataFrame()
 
-# Sidebar
+# --- Sidebar ---
 with st.sidebar:
     st.header("⚙️ Configuración Global")
-    
+
     custom_url = st.text_input("🔗 Enlace personalizado (opcional)", placeholder="https://datos.gob.cl/...")
 
-    limit = st.slider("Límite de registros", 100, 200)
+    limit = st.slider("Límite de registros", 100, 5000, value=1000, step=100)
 
     if st.button("Cargar Datos", type="primary", key="btn_cargar_datos"):
         with st.spinner("Obteniendo datos..."):
@@ -213,23 +215,57 @@ with st.sidebar:
         """
     )
 
-# Layout 
+# --- Cargar datos en memoria ---
 if 'df' not in st.session_state:
     st.session_state.df = pd.DataFrame()
 
 df = st.session_state.df.copy()
 
-# tabla con filtros 
-st.header("Appweb solemne 2 taller de programación")
+st.header("Appweb Solemne 2 - Taller de Programación")
 st.subheader("📋 Datos Crudos con Filtros")
 st.dataframe(df, use_container_width=True)
 
-# Sin datos, no mostrar 
-if df.empty:
+# --- Filtro dinámico ---
+if not df.empty:
+    st.markdown("---")
+    st.subheader("🔍 Búsqueda Avanzada")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        filtro_columna = st.selectbox(
+            "Selecciona columna para filtrar",
+            df.columns.tolist(),
+            key="select_filtro_col"
+        )
+
+    with col2:
+        if pd.api.types.is_numeric_dtype(df[filtro_columna]):
+            min_val = float(df[filtro_columna].min())
+            max_val = float(df[filtro_columna].max())
+            val_range = st.slider(
+                f"Rango de {filtro_columna}",
+                min_val, max_val, (min_val, max_val)
+            )
+            df_filtrado = df[df[filtro_columna].between(*val_range)]
+        else:
+            opciones = df[filtro_columna].dropna().unique().tolist()
+            seleccion = st.multiselect(
+                f"Valores de {filtro_columna}",
+                opciones,
+                default=opciones,
+                key="select_filtro_val"
+            )
+            df_filtrado = df[df[filtro_columna].isin(seleccion)]
+
+    st.dataframe(df_filtrado, use_container_width=True)
+    st.markdown(f"**Registros encontrados:** {len(df_filtrado)}")
+    st.markdown("---")
+else:
     st.info("Cargue datos para comenzar")
     st.stop()
 
-# Selección variables y tipo gráfico
+# --- Visualización ---
 cols = df.columns.tolist()
 
 col1, col2, col3 = st.columns([0.4, 0.4, 0.2])
@@ -245,44 +281,49 @@ with col3:
 
 if st.button("Generar Visualización", key="btn_generar_viz"):
     try:
-        fig, ax = plt.subplots(figsize=(10, 6))
-
-        if chart_type == "Barras":
-            if pd.api.types.is_numeric_dtype(df[y_var]):
-                df.groupby(x_var)[y_var].mean().plot(kind='bar', ax=ax)
-                ax.set_ylabel(f"Promedio de {y_var}")
-            else:
-                df[x_var].value_counts().plot(kind='bar', ax=ax)
-                ax.set_ylabel(f"Conteo de {x_var}")
-
-        elif chart_type == "Líneas":
-            if pd.api.types.is_numeric_dtype(df[y_var]):
-                df.groupby(x_var)[y_var].mean().sort_index().plot(kind='line', ax=ax, marker='o')
-                ax.set_ylabel(f"Promedio de {y_var}")
-            else:
-                df[x_var].value_counts().sort_index().plot(kind='line', ax=ax, marker='o')
-                ax.set_ylabel(f"Conteo de {x_var}")
-
-        elif chart_type == "Torta":
-            df[x_var].value_counts().plot(kind='pie', ax=ax, autopct='%1.1f%%')
+        if chart_type == "Torta":
+            fig, ax = plt.subplots(figsize=(8, 8))
+            df[x_var].value_counts().plot(kind='pie', autopct='%1.1f%%', ax=ax)
             ax.set_ylabel("")
+            ax.set_title(f"Distribución de {x_var}")
+            st.pyplot(fig)
+        else:
+            fig, ax = plt.subplots(figsize=(10, 6))
 
-        elif chart_type == "Histograma":
-            if pd.api.types.is_numeric_dtype(df[y_var]):
-                df[y_var].dropna().plot(kind='hist', bins=20, ax=ax)
-                ax.set_xlabel(y_var)
-                ax.set_ylabel("Frecuencia")
-            else:
-                st.warning("Seleccione una variable numérica para el histograma")
+            if chart_type == "Barras":
+                if pd.api.types.is_numeric_dtype(df[y_var]):
+                    df.groupby(x_var)[y_var].mean().plot(kind='bar', ax=ax)
+                    ax.set_ylabel(f"Promedio de {y_var}")
+                else:
+                    df[x_var].value_counts().plot(kind='bar', ax=ax)
+                    ax.set_ylabel(f"Conteo de {x_var}")
 
-        elif chart_type == "Dispersión":
-            if pd.api.types.is_numeric_dtype(df[x_var]) and pd.api.types.is_numeric_dtype(df[y_var]):
-                df.plot(kind='scatter', x=x_var, y=y_var, ax=ax)
-            else:
-                st.warning("Seleccione variables numéricas para gráfico de dispersión")
+            elif chart_type == "Líneas":
+                if pd.api.types.is_numeric_dtype(df[y_var]):
+                    df.groupby(x_var)[y_var].mean().sort_index().plot(kind='line', ax=ax, marker='o')
+                    ax.set_ylabel(f"Promedio de {y_var}")
+                else:
+                    df[x_var].value_counts().sort_index().plot(kind='line', ax=ax, marker='o')
+                    ax.set_ylabel(f"Conteo de {x_var}")
 
-        ax.set_title(f"{chart_type}: {x_var} vs {y_var}")
-        st.pyplot(fig)
+            elif chart_type == "Histograma":
+                if pd.api.types.is_numeric_dtype(df[y_var]):
+                    df[y_var].dropna().plot(kind='hist', bins=20, ax=ax)
+                    ax.set_xlabel(y_var)
+                    ax.set_ylabel("Frecuencia")
+                else:
+                    st.warning("Seleccione una variable numérica para el histograma")
+                    st.stop()
+
+            elif chart_type == "Dispersión":
+                if pd.api.types.is_numeric_dtype(df[x_var]) and pd.api.types.is_numeric_dtype(df[y_var]):
+                    df.plot(kind='scatter', x=x_var, y=y_var, ax=ax)
+                else:
+                    st.warning("Seleccione variables numéricas para gráfico de dispersión")
+                    st.stop()
+
+            ax.set_title(f"{chart_type}: {x_var} vs {y_var}")
+            st.pyplot(fig)
 
     except Exception as e:
         st.error(f"Error al generar gráfico: {str(e)}")
