@@ -206,9 +206,10 @@ with st.sidebar:
         ### Cómo usar esta app
 
         1. Puedes dejar el enlace en blanco o pegar uno de datos.gob.cl.
-        2. Presiona **Cargar Datos** para obtener el conjunto de datos.
-        3. Selecciona variables y tipo de gráfico.
-        4. Haz clic en **Generar Visualización**.
+        2. Una vez pegado el enlace presiona enter
+        3. Haz click en **Cargar Datos** para obtener el conjunto de datos.
+        4. Selecciona variables y tipo de gráfico.
+        5. Haz clic en **Generar Visualización**.
         """
     )
 
