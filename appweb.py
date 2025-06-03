@@ -11,7 +11,6 @@ st.set_page_config(
 )
 
 # CSS aun no manejamos el css asi que este css esta hecho con la ayuda de ia y videos de youtube
-
 st.markdown("""
 <style>
     :root {
@@ -162,24 +161,17 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-#  manejo de datos 
 class DataHandler:
     def __init__(self):
-        self.RESOURCE_ID = "4e5f5e98-1bfb-464d-82e2-dfa5013e74a1"
-        self.API_URL = "https://datos.gob.cl/api/3/action/datastore_search"
+        self.CSV_URL = "https://datos.gob.cl/dataset/permisos-de-circulacion-12025/resource/346da1c7-5a58-4b25-966e-6c832228cdb3/download/permiso-de-circulacion-2025.csv"
 
     def get_data(self, limit=1000):
         try:
-            response = requests.get(
-                self.API_URL,
-                params={"resource_id": self.RESOURCE_ID, "limit": limit},
-                timeout=10
-            )
-            data = response.json()["result"]["records"]
-            df = pd.DataFrame(data)
+            df = pd.read_csv(self.CSV_URL, sep=";", encoding='latin1')
             df.columns = [col.strip().upper() for col in df.columns]
-            df["FECHA"] = pd.to_datetime(df["FECHA"], errors='coerce')
-            return df
+            if "FECHA" in df.columns:
+                df["FECHA"] = pd.to_datetime(df["FECHA"], errors='coerce')
+            return df.head(limit)
         except Exception as e:
             st.error(f"Error al obtener datos: {str(e)}")
             return pd.DataFrame()
@@ -191,16 +183,13 @@ handler = DataHandler()
 with st.sidebar:
     st.header("⚙️ Configuración Global")
 
-    limit = st.slider("Límite de registros", 100,200 )
+    limit = st.slider("Límite de registros", 100, 200)
 
     if st.button("Cargar Datos", type="primary", key="btn_cargar_datos"):
         with st.spinner("Obteniendo datos..."):
             st.session_state.df = handler.get_data(limit=limit)
 
-    st.markdown("---")
-    st.markdown(
-        """
-        ### Cómo usar esta app
+          ### Cómo usar esta app
 
         1. Presiona **Cargar Datos** para obtener el conjunto de datos.
         2. Selecciona las variables que deseas para el **Eje X** y **Eje Y**.
@@ -216,7 +205,7 @@ if 'df' not in st.session_state:
 df = st.session_state.df.copy()
 
 # tabla con filtros 
-st.header("Appweb solemne 2 taller de programacion")
+st.header("Appweb solemne 2 taller de programación")
 st.subheader("📋 Datos Crudos con Filtros")
 st.dataframe(df, use_container_width=True)
 
